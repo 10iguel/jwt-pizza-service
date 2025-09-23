@@ -48,11 +48,11 @@ describe('GET /api/franchise', () => {
 
 
 
-async function createAdminUser() {
-    let user = {password: "sosecret", roles: [{role: Role.Admin}]};
-    user = await DB.addUser(user);
-    return user;
-}
+// async function createAdminUser() {
+//     let user = {password: "sosecret", roles: [{role: Role.Admin}]};
+//     user = await DB.addUser(user);
+//     return user;
+// }
 function expectValidJwt(potentialJwt) {
     expect(potentialJwt).toMatch(/^[a-zA-Z0-9\-_]*\.[a-zA-Z0-9\-_]*\.[a-zA-Z0-9\-_]*$/);
 }
