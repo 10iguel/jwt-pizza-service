@@ -84,10 +84,7 @@ franchiseRouter.post(
   '/',
   authRouter.authenticateToken,
   asyncHandler(async (req, res) => {
-      console.log(req.user);
-      console.log(req.user.isRole(Role.Admin));
     if (!req.user.isRole(Role.Admin)) {
-        console.log("It got here")
       throw new StatusCodeError('unable to create a franchise', 403);
     }
 

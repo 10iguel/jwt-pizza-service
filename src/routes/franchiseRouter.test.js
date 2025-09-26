@@ -16,7 +16,6 @@ async function createAdminUser() {
     let user = { password: 'toomanysecrets', roles: [{ role: Role.Admin }] };
     user.name = randomName();
     user.email = user.name + '@admin.com';
-    user.isRole = (role) => role === Role.Admin;
     user = await DB.addUser(user);
     return { ...user, password: 'toomanysecrets' };
 }
@@ -25,18 +24,30 @@ function expectValidJwt(potentialJwt) {
 }
 
 beforeAll(async () => {
-    testUser.email = randomName() + '@test.com';
-    const registerRes = await request(app).post('/api/auth').send(testUser);
-    testUserAuthToken = registerRes.body.token;
-    expectValidJwt(testUserAuthToken);
     adminUser = await createAdminUser();
-    console.log('Admin user after creation:', JSON.stringify(adminUser, null, 2));
     const adminRegisterRes = await request(app)
         .post('/api/auth')
         .send({ name: adminUser.name, email: adminUser.email, password: adminUser.password });
     adminAuthToken = adminRegisterRes.body.token;
     expectValidJwt(adminAuthToken);
 });
+
+describe('POST /api/franchise', () => {
+    test('should return 403 for non-admin user', async () => {
+        testUser.email = randomName() + '@test.com';
+        const registerRes = await request(app).post('/api/auth').send(testUser);
+        testUserAuthToken = registerRes.body.token;
+        expectValidJwt(testUserAuthToken);
+        const newFranchise = { name: 'pizzaPocket', admins: [{ email: 'f@jwt.com' }] };
+        const response = await request(app)
+            .post('/api/franchise')
+            .set('Authorization', `Bearer ${testUserAuthToken}`)
+            .send(newFranchise);
+        expect(response.status).toBe(403);
+        expect(response.body).toEqual({ message: 'unable to create a franchise', stack: expect.any(String) });
+    });
+});
+
 
 describe('GET /api/franchise', () => {
     test('should list franchises with pagination and name filter', async () => {
@@ -52,6 +63,16 @@ describe('GET /api/franchise', () => {
         expect(response.body).toEqual({ franchises: mockFranchises, more: true });
         expect(DB.getFranchises).toHaveBeenCalledWith(expect.any(Object), '0', '10', 'pizzaPocket');
     });
+    test('should list franchises without authentication', async () => {
+        const mockFranchises = [
+            { id: 1, name: 'publicFranchise', admins: [], stores: [] },
+        ];
+        DB.getFranchises = jest.fn().mockResolvedValue([mockFranchises, false]);
+
+        const response = await request(app).get('/api/franchise');
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ franchises: mockFranchises, more: false });
+    });
 });
 
 describe('GET /api/franchise/:userId', () => {
@@ -59,41 +80,19 @@ describe('GET /api/franchise/:userId', () => {
         const response = await request(app).get(`/api/franchise/${adminUser.id}`);
         expect(response.status).toBe(401);
     });
+    test('should return empty array for different user (non-admin)', async () => {
+        const anotherUser = { name: 'another user', email: randomName() + '@test.com', password: 'password' };
+        const registerRes = await request(app).post('/api/auth').send(anotherUser);
+        const anotherUserToken = registerRes.body.token;
+
+        const response = await request(app)
+            .get(`/api/franchise/${adminUser.id}`)
+            .set('Authorization', `Bearer ${anotherUserToken}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual([]);
+    });
 })
-
-// describe('POST /api/franchise', () => {
-//     test('should create a franchise with an existing admin', async () => {
-//         console.log(adminUser.isRole)
-//         jest.spyOn(adminUser, 'isRole').mockImplementation((role) => role === Role.Admin);
-//
-//         const franchiseData = {
-//             name: randomName(),
-//             admins: [{ email: adminUser.email }],
-//         };
-//         const res = await request(app)
-//             .post('/api/franchise')
-//             .set('Authorization', `Bearer ${adminAuthToken}`)
-//             .send({
-//                 franchiseData
-//             });
-//
-//         expect(res.statusCode).toBe(200);
-//         expect(res.body).toHaveProperty('id');
-//         expect(res.body).toHaveProperty('name', franchiseName);
-//         expect(res.body.admins[0]).toHaveProperty('email', adminUser.email);
-//     });
-//
-//     test('should return 403 for non-admin user', async () => {
-//         const newFranchise = { name: 'pizzaPocket', admins: [{ email: 'f@jwt.com' }] };
-//         const response = await request(app)
-//             .post('/api/franchise')
-//             .set('Authorization', `Bearer ${testUserAuthToken}`)
-//             .send(newFranchise);
-//         expect(response.status).toBe(403);
-//         expect(response.body).toEqual({ message: 'unable to create a franchise', stack: expect.any(String) });
-//     });
-// });
-
 
 describe('DELETE /api/franchise/:franchiseId', () => {
     test('should delete a franchise', async () => {
@@ -112,5 +111,44 @@ describe('DELETE /api/franchise/:franchiseId', () => {
 
         expect(resDelete.statusCode).toBe(200);
         expect(resDelete.body).toEqual({ message: 'franchise deleted' });
+    });
+});
+describe('POST /api/franchise/:franchiseId/store', () => {
+    test('should return 401 for unauthenticated request', async () => {
+        const storeData = { name: 'Unauthorized Store' };
+        const response = await request(app)
+            .post('/api/franchise/1/store')
+            .send(storeData);
+
+        expect(response.status).toBe(401);
+    });
+
+    test('should return 403 for non-existent franchise', async () => {
+        const storeData = { name: 'Store for non-existent franchise' };
+        const response = await request(app)
+            .post('/api/franchise/999999/store')
+            .set('Authorization', `Bearer ${adminAuthToken}`)
+            .send(storeData);
+
+        expect(response.status).toBe(403);
+        expect(response.body).toEqual({ message: 'unable to create a store', stack: expect.any(String) });
+    });
+});
+
+describe('DELETE /api/franchise/:franchiseId/store/:storeId', () => {
+    test('should return 401 for unauthenticated request', async () => {
+        const response = await request(app)
+            .delete('/api/franchise/1/store/1');
+
+        expect(response.status).toBe(401);
+    });
+
+    test('should return 403 for non-existent franchise', async () => {
+        const response = await request(app)
+            .delete('/api/franchise/999999/store/1')
+            .set('Authorization', `Bearer ${adminAuthToken}`);
+
+        expect(response.status).toBe(403);
+        expect(response.body).toEqual({ message: 'unable to delete a store', stack: expect.any(String) });
     });
 });
