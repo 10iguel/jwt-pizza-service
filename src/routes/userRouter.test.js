@@ -22,18 +22,6 @@ function randomName() {
     return Math.random().toString(36).substring(2, 12);
 }
 
-async function registerUser(service) {
-    const testUser = {
-        name: 'pizza diner',
-        email: `${randomName()}@test.com`,
-        password: 'a',
-    };
-    const registerRes = await service.post('/api/auth').send(testUser);
-    registerRes.body.user.password = testUser.password;
-
-    return [registerRes.body.user, registerRes.body.token];
-}
-
 
 async function createAdminUser() {
     let user = { password: 'toomanysecrets', roles: [{ role: Role.Admin }] };
@@ -187,20 +175,6 @@ describe('PUT /api/user/:userId', () => {
     });
 });
 describe('DELETE /api/user/:userId', () => {
-    let anotherUserId;
-    let anotherUserToken;
-
-    beforeAll(async () => {
-        const anotherUser = {
-            name: randomName(),
-            email: randomName() + '@test.com',
-            password: 'password'
-        };
-        const registerRes = await request(app).post('/api/auth').send(anotherUser);
-        anotherUserId = registerRes.body.user.id;
-        anotherUserToken = registerRes.body.token;
-    });
-
     test('should allow user to delete self', async () => {
         const response = await request(app)
             .delete(`/api/user/${testUserId}`)
@@ -221,7 +195,6 @@ describe('DELETE /api/user/:userId', () => {
             password: 'password'
         };
         const registerRes = await request(app).post('/api/auth').send(tempUser);
-        const tempUserId = registerRes.body.user.id;
         const tempToken = registerRes.body.token;
 
         const targetUser = {

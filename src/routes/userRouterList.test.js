@@ -25,10 +25,9 @@ const app = require('../service');
 const {Role} = require("../model/model");
 
 describe('GET /api/user (Admin only)', () => {
-    let getUsersSpy;
 
     beforeAll(() => {
-        getUsersSpy = jest.spyOn(DB, 'getUsers').mockImplementation(async () => {
+        jest.spyOn(DB, 'getUsers').mockImplementation(async () => {
             return {
                 users: [
                     { id: 1, name: 'Admin Tester', email: 'admin@test.com', roles: [{ role: 'admin' }] },

@@ -416,7 +416,7 @@ describe('Database Tests', () => {
             isRole: (role) => role === Role.Admin
         };
         const nonAdminUser = {
-            isRole: (role) => false
+            isRole: () => false
         };
 
         test('should throw unauthorized error if user is not admin', async () => {
