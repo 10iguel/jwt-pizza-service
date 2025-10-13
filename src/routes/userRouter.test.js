@@ -2,6 +2,7 @@ const request = require('supertest');
 const app = require('../service');
 const { DB } = require('../database/database.js');
 const { Role } = require('../model/model');
+const {StatusCodeError} = require("../endpointHelper");
 
 const testUser = { name: 'pizza diner', email: 'reg@test.com', password: 'a' };
 let testUserAuthToken;
@@ -9,9 +10,30 @@ let testUserId;
 let adminUser;
 let adminAuthToken;
 
+const mockConnection = {
+    beginTransaction: jest.fn(),
+    query: jest.fn(),
+    rollback: jest.fn(),
+    commit: jest.fn(),
+    end: jest.fn(),
+};
+
 function randomName() {
     return Math.random().toString(36).substring(2, 12);
 }
+
+async function registerUser(service) {
+    const testUser = {
+        name: 'pizza diner',
+        email: `${randomName()}@test.com`,
+        password: 'a',
+    };
+    const registerRes = await service.post('/api/auth').send(testUser);
+    registerRes.body.user.password = testUser.password;
+
+    return [registerRes.body.user, registerRes.body.token];
+}
+
 
 async function createAdminUser() {
     let user = { password: 'toomanysecrets', roles: [{ role: Role.Admin }] };
@@ -92,7 +114,6 @@ describe('PUT /api/user/:userId', () => {
         expectValidJwt(response.body.token);
     });
     test('should return 403 for non-admin user trying to update different user', async () => {
-        // Create another user
         const anotherUser = {
             name: 'Another User',
             email: randomName() + '@test.com',
@@ -163,5 +184,87 @@ describe('PUT /api/user/:userId', () => {
             .set('Authorization', `Bearer ${adminAuthToken}`)
             .send(updateData);
         expect(response.status).toBeGreaterThanOrEqual(400);
+    });
+});
+describe('DELETE /api/user/:userId', () => {
+    let anotherUserId;
+    let anotherUserToken;
+
+    beforeAll(async () => {
+        const anotherUser = {
+            name: randomName(),
+            email: randomName() + '@test.com',
+            password: 'password'
+        };
+        const registerRes = await request(app).post('/api/auth').send(anotherUser);
+        anotherUserId = registerRes.body.user.id;
+        anotherUserToken = registerRes.body.token;
+    });
+
+    test('should allow user to delete self', async () => {
+        const response = await request(app)
+            .delete(`/api/user/${testUserId}`)
+            .set('Authorization', `Bearer ${testUserAuthToken}`);
+
+        expect(response.status).toBe(204);
+
+        const meResponse = await request(app)
+            .get('/api/user/me')
+            .set('Authorization', `Bearer ${testUserAuthToken}`);
+        expect(meResponse.status).toBe(401);
+    });
+
+    test('should return 403 for non-admin trying to delete another user', async () => {
+        const tempUser = {
+            name: randomName(),
+            email: randomName() + '@test.com',
+            password: 'password'
+        };
+        const registerRes = await request(app).post('/api/auth').send(tempUser);
+        const tempUserId = registerRes.body.user.id;
+        const tempToken = registerRes.body.token;
+
+        const targetUser = {
+            name: randomName(),
+            email: randomName() + '@test.com',
+            password: 'password'
+        };
+        const targetRes = await request(app).post('/api/auth').send(targetUser);
+        const targetUserId = targetRes.body.user.id;
+
+        const response = await request(app)
+            .delete(`/api/user/${targetUserId}`)
+            .set('Authorization', `Bearer ${tempToken}`);
+
+        expect(response.status).toBe(403);
+        expect(response.body).toEqual({ message: 'unauthorized' });
+    });
+
+    test('should return 401 for unauthenticated request', async () => {
+        const response = await request(app).delete(`/api/user/${testUserId}`);
+        expect(response.status).toBe(401);
+    });
+
+    test('should return 401 for invalid token', async () => {
+        const response = await request(app)
+            .delete(`/api/user/${testUserId}`)
+            .set('Authorization', 'Bearer invalid-token');
+        expect(response.status).toBe(401);
+    });
+    test('deleteUser should rollback and throw StatusCodeError on query failure', async () => {
+
+        jest.spyOn(DB, 'getConnection').mockResolvedValue(mockConnection);
+
+        mockConnection.query.mockImplementationOnce(() => {
+            throw new Error('Simulated SQL failure');
+        });
+
+        await expect(DB.deleteUser(123)).rejects.toThrow(StatusCodeError);
+        await expect(DB.deleteUser(123)).rejects.toThrow('Unable to delete user: connection.execute is not a function');
+
+        expect(mockConnection.beginTransaction).toHaveBeenCalled();
+        expect(mockConnection.rollback).toHaveBeenCalled();
+        expect(mockConnection.commit).not.toHaveBeenCalled();
+        expect(mockConnection.end).toHaveBeenCalled();
     });
 });

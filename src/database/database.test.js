@@ -410,4 +410,46 @@ describe('Database Tests', () => {
             expect(mockConnection.end).toHaveBeenCalled();
         });
     });
+
+    describe('getUsers', () => {
+        const adminUser = {
+            isRole: (role) => role === Role.Admin
+        };
+        const nonAdminUser = {
+            isRole: (role) => false
+        };
+
+        test('should throw unauthorized error if user is not admin', async () => {
+            await expect(DB.getUsers(nonAdminUser))
+                .rejects.toThrow(StatusCodeError);
+        });
+        test('should return users with roles', async () => {
+            const mockUsers = [
+                { id: 1, name: 'Alice', email: 'alice@test.com' },
+                { id: 2, name: 'Bob', email: 'bob@test.com' }
+            ];
+            const mockRoles1 = [{ objectId: null, role: Role.Admin }];
+            const mockRoles2 = [{ objectId: 5, role: Role.Franchisee }];
+
+            mockConnection.execute.mockResolvedValueOnce([mockUsers]);
+
+            mockConnection.execute
+                .mockResolvedValueOnce([mockRoles1])
+                .mockResolvedValueOnce([mockRoles2]);
+
+            const result = await DB.getUsers(adminUser, 1, 2, '*');
+
+            expect(result.page).toBe(1);
+            expect(result.more).toBe(false);
+            expect(result.users).toEqual([
+                { ...mockUsers[0], roles: [{ objectId: undefined, role: Role.Admin }] },
+                { ...mockUsers[1], roles: [{ objectId: 5, role: Role.Franchisee }] }
+            ]);
+
+            expect(mockConnection.execute).toHaveBeenCalledWith(
+                expect.stringContaining('WHERE name LIKE ? LIMIT 3 OFFSET 0'),
+                ['%']
+            );
+        });
+    });
 });

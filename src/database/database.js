@@ -99,6 +99,73 @@ class DB {
     }
   }
 
+  async deleteUser(userId) {
+      const connection = await this.getConnection();
+      try {
+          await connection.beginTransaction();
+          try {
+              // Delete order items associated with the user's orders
+      //         await this.query(connection, `
+      //   DELETE oi FROM orderItem oi
+      //   JOIN dinerOrder do ON oi.orderId = do.id
+      //   WHERE do.dinerId = ?
+      // `, [userId]);
+
+              // Delete the user's orders
+              await this.query(connection, `DELETE FROM dinerOrder WHERE dinerId=?`, [userId]);
+
+              // Delete auth tokens for the user
+              await this.query(connection, `DELETE FROM auth WHERE userId=?`, [userId]);
+
+              // Delete user roles
+              await this.query(connection, `DELETE FROM userRole WHERE userId=?`, [userId]);
+
+              // Finally, delete the user
+              await this.query(connection, `DELETE FROM user WHERE id=?`, [userId]);
+
+              await connection.commit();
+          } catch (error) {
+              await connection.rollback();
+              throw new StatusCodeError(`Unable to delete user: ${error.message}`, 500);
+          }
+      } finally {
+          connection.end();
+      }
+  }
+
+  async getUsers(authUser, page = 1, limit = 10, nameFilter = '*') {
+      if (!authUser?.isRole(Role.Admin)) {
+          throw new StatusCodeError('Unauthorized: Admin role required', 403);
+      }
+
+      const connection = await this.getConnection();
+      try {
+          const offset = (page - 1) * limit;
+          nameFilter = nameFilter.replace(/\*/g, '%');
+
+          let users = await this.query(connection, `SELECT id, name, email FROM user WHERE name LIKE ? LIMIT ${limit + 1} OFFSET ${offset}`, [nameFilter]);
+
+          const more = users.length > limit;
+          if (more) {
+              users = users.slice(0, limit);
+          }
+
+            // Fetch roles for each user
+          for (const user of users) {
+              const roleResult = await this.query(connection, `SELECT * FROM userRole WHERE userId=?`, [user.id]);
+              user.roles = roleResult.map((r) => ({
+                  objectId: r.objectId || undefined,
+                  role: r.role
+              }));
+            }
+
+          return { users, page, more };
+      } finally {
+          connection.end();
+      }
+  }
+
+
   async loginUser(userId, token) {
     token = this.getTokenSignature(token);
     const connection = await this.getConnection();
