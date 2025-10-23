@@ -104,23 +104,13 @@ class DB {
       try {
           await connection.beginTransaction();
           try {
-              // Delete order items associated with the user's orders
-      //         await this.query(connection, `
-      //   DELETE oi FROM orderItem oi
-      //   JOIN dinerOrder do ON oi.orderId = do.id
-      //   WHERE do.dinerId = ?
-      // `, [userId]);
 
-              // Delete the user's orders
               await this.query(connection, `DELETE FROM dinerOrder WHERE dinerId=?`, [userId]);
 
-              // Delete auth tokens for the user
               await this.query(connection, `DELETE FROM auth WHERE userId=?`, [userId]);
 
-              // Delete user roles
               await this.query(connection, `DELETE FROM userRole WHERE userId=?`, [userId]);
 
-              // Finally, delete the user
               await this.query(connection, `DELETE FROM user WHERE id=?`, [userId]);
 
               await connection.commit();
@@ -150,7 +140,6 @@ class DB {
               users = users.slice(0, limit);
           }
 
-            // Fetch roles for each user
           for (const user of users) {
               const roleResult = await this.query(connection, `SELECT * FROM userRole WHERE userId=?`, [user.id]);
               user.roles = roleResult.map((r) => ({
