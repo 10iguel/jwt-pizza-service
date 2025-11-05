@@ -22,7 +22,6 @@ const requestTracker = async (req, res, next) => {
             delReqs++;
             break;
         default:
-            // ya mum 🖕🏻
             break;
     }
     totalReqs++;
