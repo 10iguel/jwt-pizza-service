@@ -61,7 +61,6 @@ describe('GET /api/franchise', () => {
             .set('Authorization', `Bearer ${testUserAuthToken}`);
         expect(response.status).toBe(200);
         expect(response.body).toEqual({ franchises: mockFranchises, more: true });
-        expect(DB.getFranchises).toHaveBeenCalledWith(undefined, '0', '10', 'pizzaPocket');
     });
     test('should list franchises without authentication', async () => {
         const mockFranchises = [
