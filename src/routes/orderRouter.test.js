@@ -31,7 +31,7 @@ function expectValidJwt(potentialJwt) {
 
 beforeAll(async () => {
     adminUser = await createAdminUser();
-    console.log('Admin user after creation:', JSON.stringify(adminUser, null, 2));
+    // console.log('Admin user after creation:', JSON.stringify(adminUser, null, 2));
     const adminRegisterRes = await request(app)
         .post('/api/auth')
         .send({ name: adminUser.name, email: adminUser.email, password: adminUser.password });

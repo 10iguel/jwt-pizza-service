@@ -178,7 +178,7 @@ function sendMetricsPeriodically(period) {
             sendMetricToGrafana("cpu", getCpuUsagePercentage(), "gauge", "%");
             sendMetricToGrafana("memory", getMemoryUsagePercentage(), "gauge", "%");
         } catch (error) {
-            console.log("Error sending metrics", error);
+            // console.log("Error sending metrics", error);
         }
     }, period);
 }
