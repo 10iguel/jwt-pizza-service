@@ -57,7 +57,7 @@ app.use((err, req, res, next) => {
   next();
 });
 
-process.on("unhandledRejection", (reason, p) => {
+process.on("unhandledRejection", (reason) => {
     logger.unhandledErrorLog(reason);
 })
 
