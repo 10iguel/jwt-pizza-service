@@ -4,8 +4,14 @@ const { DB } = require('../database/database.js');
 const { Role } = require('../model/model');
 const config = require('../config.js');
 
-// Mock fetch for factory API calls
-global.fetch = jest.fn();
+global.fetch = jest.fn(() =>
+    Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({}),
+        text: () => Promise.resolve('OK')
+    })
+);
 
 const testUser = { name: 'pizza diner', email: 'reg@test.com', password: 'a' };
 let testUserAuthToken;

@@ -19,6 +19,10 @@ jest.mock('./dbModel.js', () => ({
     ]
 }));
 
+jest.mock('../logger.js', () => ({
+    databaseQueryLog: jest.fn().mockImplementation(() => {}),
+}));
+
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
 const { StatusCodeError } = require('../endpointHelper.js');
