@@ -125,8 +125,10 @@ orderRouter.post(
           })
       );
     if (r.ok) {
+        console.log(j.reportUrl)
       res.send({ order, followLinkToEndChaos: j.reportUrl, jwt: j.jwt });
     } else {
+        console.log(j.reportUrl)
       res.status(500).send({ message: 'Failed to fulfill order at factory', followLinkToEndChaos: j.reportUrl });
     }
   })
