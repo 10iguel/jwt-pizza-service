@@ -45,6 +45,26 @@ orderRouter.docs = [
   },
 ];
 
+// let enableChaos = false;
+// orderRouter.put(
+//     '/chaos/:state',
+//     authRouter.authenticateToken,
+//     asyncHandler(async (req, res) => {
+//         if (req.user.isRole(Role.Admin)) {
+//             enableChaos = req.params.state === 'true';
+//         }
+//
+//         res.json({ chaos: enableChaos });
+//     })
+// );
+//
+// orderRouter.post('/', (req, res, next) => {
+//     if (enableChaos && Math.random() < 0.5) {
+//         throw new StatusCodeError('Chaos monkey', 500);
+//     }
+//     next();
+// });
+
 // getMenu
 orderRouter.get(
   '/menu',
@@ -94,12 +114,17 @@ orderRouter.post(
       body: JSON.stringify({ diner: { id: req.user.id, name: req.user.name, email: req.user.email }, order }),
     });
     const j = await r.json();
-    if (r.ok) {
       logger.factoryResponseLog(
           `${config.factory.url}/api/order`,
           'POST',
-          r.statusText,
-      )
+          JSON.stringify({
+              status: r.status,
+              statusText: r.statusText,
+              ok: r.ok,
+              body: j
+          })
+      );
+    if (r.ok) {
       res.send({ order, followLinkToEndChaos: j.reportUrl, jwt: j.jwt });
     } else {
       res.status(500).send({ message: 'Failed to fulfill order at factory', followLinkToEndChaos: j.reportUrl });
